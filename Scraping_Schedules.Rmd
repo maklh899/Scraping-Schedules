@@ -1,0 +1,156 @@
+---
+title: "Schedule Scrapping"
+output:
+  pdf_document: default
+  html_notebook: default
+name: Makena Haroldson
+---
+### Introduction
+
+Csu Chico's Spring 2019 and 2020 Math and Csci courses
+
+```{r}
+include <- function(library_name){
+  if( !(library_name %in% installed.packages()) )
+    install.packages(library_name) 
+  library(library_name, character.only=TRUE)
+}
+suppressMessages(include("rvest"))
+suppressMessages(include("tidyr"))
+suppressMessages(include("dplyr"))
+suppressMessages(include("stringr"))
+```
+
+### Class Schedule Function
+
+This is a function that we will be using to transfer information from websites. Note that one the website they had two types of classes: a regular classes(ex. lecture) and alternative class(ex. labs and activity). However, the website did not maintain a consistent order and so we will import class composition so we can keep track of each type.
+```{r}
+read_class_schedule <- function(url){
+  url_html <- read_html(url)
+
+#obtain semester and year of courses
+Semester <-url_html %>% 
+              html_nodes(".subjpagessubjheader") %>% 
+              html_text()
+
+str_semester <- str_extract(Semester,"[a-z,A-z]+ [0-9]+")
+
+#obtain regular classes information
+classes <- url_html %>% html_nodes(".classrow")
+
+subj <- classes %>% 
+              html_nodes("td.subj") %>% 
+              html_text()
+course_num <- classes %>% 
+              html_nodes("td.cat_num") %>% 
+              html_text() 
+course_sect <- classes %>% 
+              html_nodes("td.sect") %>% 
+              html_text() %>% 
+              as.integer()
+course_comp <- classes %>% 
+              html_nodes("td.comp") %>% 
+              html_text() 
+title <- classes %>% 
+              html_nodes("td.title") %>% 
+              html_text()
+instructor <- classes %>% 
+              html_nodes("td.Instructor") %>% 
+              html_text()
+total_enroll <- classes %>% 
+          html_nodes("td.enrtot") %>% 
+          html_text() %>% 
+          as.integer()
+
+#obtain regular classes information
+classes_alt <- url_html %>% html_nodes(".classrowalt")
+
+subj_a <- classes_alt %>% 
+              html_nodes("td.subj") %>% 
+              html_text()
+course_num_a <- classes_alt %>% 
+              html_nodes("td.cat_num") %>% 
+              html_text()
+course_sect_a <- classes_alt %>% 
+              html_nodes("td.sect") %>% 
+              html_text() %>% 
+              as.integer()
+course_comp_a <- classes_alt %>% 
+              html_nodes("td.comp") %>% 
+              html_text() 
+title_a <- classes_alt %>% 
+              html_nodes("td.title") %>% 
+              html_text()
+instructor_a <- classes_alt %>% 
+              html_nodes("td.Instructor") %>% 
+              html_text()
+total_enroll_a <- classes_alt %>% 
+          html_nodes("td.enrtot") %>% 
+          html_text() %>% 
+          as.integer()
+
+#create tables of regular classes
+class_table <- tibble(semester=str_semester, subj=subj, course_num=course_num, sect=course_sect, comp=course_comp, title=title, instructor=instructor,  total_enroll=total_enroll)
+
+#create tables of alterbative classes
+alt_class_tables <- tibble(semester=str_semester, subj=subj_a, course_num=course_num_a, sect=course_sect_a, comp=course_comp_a, title=title_a, instructor=instructor_a, total_enroll=total_enroll_a)
+
+#merge the two tables together
+course_table <- bind_rows(class_table,alt_class_tables)
+
+#separate the semester and year into individual columns
+course_table <- separate(course_table, semester, into= c("semester","year"), sep= " ")
+
+#merge a course subject and number columns together
+course_table$course <- paste(course_table$subj, course_table$course_num)
+
+#delete the unused columns
+course_table <- subset(course_table, select = -c(subj,course_num))
+
+#reorder columns
+course_table <- course_table[,c(1,2,8,3,4,5,6,7)]
+
+return(course_table)
+}
+```
+
+### Importation and Merging
+
+Here we are importing the website's urls.
+```{r}
+CS19S_url <- "http://ems.csuchico.edu/APSS/schedule/spr2019/CSCI.shtml"
+
+CS20S_url <- "http://ems.csuchico.edu/APSS/schedule/spr2020/CSCI.shtml"
+
+Mh19S_url <- "http://ems.csuchico.edu/APSS/schedule/spr2019/MATH.shtml"
+
+Mh20S_url <- "http://ems.csuchico.edu/APSS/schedule/spr2020/MATH.shtml"
+```
+
+Now we call the function from above and send in each url. After we have all our tables, we will then merge all 4 into 1 table.
+```{r}
+Csci19_table <- read_class_schedule(url = CS19S_url)
+View(Csci19_table)
+
+Csci20_table <-  read_class_schedule(url = CS20S_url)
+View(Csci20_table)
+
+Math19_table <-  read_class_schedule(url = Mh19S_url)
+View(Math19_table)
+
+Math20_table <-  read_class_schedule(url = Mh20S_url)
+View(Math20_table)
+
+#merge the 4 tables together
+Courses_table <- bind_rows(Csci19_table,Csci20_table)
+Courses_table <- bind_rows(Courses_table,Math19_table)
+Courses_table <- bind_rows(Courses_table,Math20_table)
+View(Courses_table)
+```
+
+
+
+
+
+
+
